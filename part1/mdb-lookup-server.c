@@ -12,6 +12,9 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <mylist.h>
+#include "mdb.h"
+
 #define MAXPENDING 5          // Maximum outstanding connection requests
 #define MAX_LINE_LENGTH 1024  // Maximum line length for request and headers
 #define DISK_IO_BUF_SIZE 4096 // Size of buffer for reading and sending files
@@ -173,12 +176,37 @@ int main(int argc, char *argv[])
          * Close server socket, handle the request, and exit.
          */
         
-        //Open the database file before handling client to ensure database is
-        //loaded only once per client connection
-        FILE *fp = fopen(database, "rb");
-        if (fp == NULL)
-            die(database);
+        
+        close(serv_fd);
 
+        char clnt_ip[INET_ADDRSTRLEN];
+
+        if (inet_ntop(AF_INET, &clnt_addr.sin_addr, clnt_ip, sizeof(clnt_ip))
+            == NULL)
+            die("inet_ntop");
+        
+        //Print connection started message
+        fprintf(stderr, "Connection started: %s\n", clnt_ip);
+        
+        //FILE* for reading
+        FILE *fpr = fdopen(clnt_fd, "r");
+        if(fpr == NULL)
+            die("fdopen");
+
+        //FILE* for writing
+        FILE *fpw = fdopen(clnt_fd, "w");
+        if(fpw == NULL)
+            die("fdopen");
+
+        //FILE* to store database
+        FILE *fp = fopen(database,"rb");
+        if(fp == NULL)
+            die("fopen");
+
+        //Set fpw to line-buffering so that lines are flushed immediately
+        setlinebuf(fpw);
+
+        //mdb-lookup skeleton code
         struct List list;
         initList(&list);
 
@@ -188,20 +216,64 @@ int main(int argc, char *argv[])
 
         fclose(fp);
 
+        /*
+         * lookup loop
+         */
+
         char line[1024];
         char key[6];
-        
-        //close(serv_fd);
 
-        char clnt_ip[INET_ADDRSTRLEN];
 
-        if (inet_ntop(AF_INET, &clnt_addr.sin_addr, clnt_ip, sizeof(clnt_ip))
-            == NULL)
-            die("inet_ntop");
+        while (fgets(line, sizeof(line), fpr) != NULL) {
 
-        
-        
-        close(serv_fd);
+            /*
+             * clean up user input
+             */
+
+            // must null-terminate the string manually after strncpy().
+            strncpy(key, line, sizeof(key) - 1);
+            key[sizeof(key) - 1] = '\0';
+
+            // if newline or carriage return is within the first KeyMax characters, remove it.
+            int last = strlen(key) - 1;
+            if (key[last] == '\n'|| key[last] == '\r'){
+                if(key[last-1] == '\r'){
+                    key[last-1] = '\0';
+                }
+                else{
+                    key[last] = '\0';
+                }
+            }
+            
+            // user might have typed more than sizeof(line) - 1 characters in line;
+            // continue fgets()ing until we encounter a newline.
+            while (line[strlen(line) - 1] != '\n' && fgets(line, sizeof(line), fpr))
+                ;
+
+            /*
+             * search with key
+             */
+
+            // traverse the list, printing out the matching records
+            struct Node *node = list.head;
+            int recNo = 1;
+            while (node) {
+                struct MdbRec *rec = (struct MdbRec *)node->data;
+
+                if (strstr(rec->name, key) || strstr(rec->msg, key))
+                    fprintf(fpw, "%4d: {%s} said {%s}\n", recNo, rec->name, rec->msg);
+
+                node = node->next;
+                recNo++;
+            }
+            //print new line to separate requests
+            fprintf(fpw, "\n");
+        }
+        freemdb(&list);
+
+        //Send message that connection terminated
+        fprintf(stderr, "Connection terminated: %s\n", clnt_ip);
+
         exit(0);
     }
 
