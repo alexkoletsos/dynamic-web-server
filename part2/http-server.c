@@ -451,15 +451,10 @@ int main(int argc, char *argv[])
      * We have a well-formed HTTP GET request; time to handle it.
      */
    
-    // If URI = "mdb-lookup" or "mdb-lookup?", we should handle mdb request;
-    // otherwise, handle file request
-    if(strcmp(request_uri, "/mdb-lookup") == 0 || strncmp(request_uri, "/mdb-lookup?", strlen("/mdb-lookup?")) == 0) {
-       //send status code of 200 before handling request
-       status_code = 200;
-       send_status_line(clnt_w, status_code);
-       send_blank_line(clnt_w); 
-
-       const char *form = 
+    //if there is a key in the request uri, mdb-lookup the key in the database
+         if(strncmp(request_uri, "/mdb-lookup?key=", strlen("/mdb-lookup?key=")) == 0) {
+             const char *form =
+           "<html><body>\n"
            "<h1>mdb-lookup</h1>\n"
            "<p>\n"
            "<form method=GET action=/mdb-lookup>\n"
@@ -467,20 +462,12 @@ int main(int argc, char *argv[])
            "<input type=submit>\n"
            "</form>\n"
            "<p>\n";
-        
-        fprintf(clnt_w, "%s", form);
-        fflush(clnt_w);
 
-        //if there is a key in the request uri, mdb-lookup the key in the database
-        if(strncmp(request_uri, "/mdb-lookup?key=", strlen("/mdb-lookup?key=")) == 0) {
             char *key = request_uri + strlen("/mdb-lookup?key=");
             //write keyword to mdb_fpw
             fprintf(mdb_fpw, "%s\n", key);
             fflush(mdb_fpw);
-
-            //read lines from mdb-lookup-server and format as table
-            fprintf(clnt_w, "<p><table border>\n");
-            
+           
             char mdb_line[1000];
             int count = 0;
             
@@ -488,8 +475,15 @@ int main(int argc, char *argv[])
                 if(fgets(mdb_line, sizeof(mdb_line), mdb_fpr) == NULL) {
                     status_code = 500;
                     send_error_status(clnt_w, status_code);
-                    send_blank_line(clnt_w);
                     goto terminate_connection;
+                }
+                else if(count == 0) {
+                    status_code = 200;
+                    send_status_line(clnt_w, status_code);
+                    send_blank_line(clnt_w);
+                    fprintf(clnt_w, "%s", form);
+                    fprintf(clnt_w, "<p><table border>\n");
+                    fflush(clnt_w);
                 }
                 if(strcmp(mdb_line, "\n") == 0) {
                     break;
@@ -512,12 +506,26 @@ int main(int argc, char *argv[])
             if(ferror(mdb_fpr)) {
                 die("mdb lookup");
             }
-            fprintf(clnt_w, "</table>\n");
+            fprintf(clnt_w, "</table>\n</body></html>\n");
             fflush(clnt_w);
-        } 
-        fprintf(clnt_w, "</body></html>\n");
-        fflush(clnt_w);
 
+    }
+    else if(strcmp(request_uri, "/mdb-lookup") == 0 || strncmp(request_uri, "/mdb-lookup?", strlen("/mdb-lookup?")) == 0) {
+             const char *form =
+           "<html><body>\n"
+           "<h1>mdb-lookup</h1>\n"
+           "<p>\n"
+           "<form method=GET action=/mdb-lookup>\n"
+           "lookup: <input type=text name=key>\n"
+           "<input type=submit>\n"
+           "</form>\n"
+           "<p>\n"
+           "</body></html>\n";    
+
+            status_code = 200;
+            send_status_line(clnt_w, status_code);
+            send_blank_line(clnt_w);
+            fprintf(clnt_w, "%s", form); 
     }
     else {
         status_code = handle_file_request(web_root, request_uri, clnt_w);
