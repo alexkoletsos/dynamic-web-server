@@ -206,7 +206,7 @@ int main(int argc, char *argv[])
         //Set fpw to line-buffering so that lines are flushed immediately
         setlinebuf(fpw);
 
-        //mdb-lookup skeleton code
+        //mdb-lookup code
         struct List list;
         initList(&list);
 
@@ -273,7 +273,9 @@ int main(int argc, char *argv[])
 
         //Send message that connection terminated
         fprintf(stderr, "Connection terminated: %s\n", clnt_ip);
-
+        
+        fclose(fpr);
+        fclose(fpw);
         exit(0);
     }
 
