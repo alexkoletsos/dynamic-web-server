@@ -1,16 +1,6 @@
-This file should contain:
-
-  - Alexandra Koletsos
-  - ak4749
-  - Lab 7
-
-The description should indicate whether your solution for the part is
-working or not.  You may also want to include anything else you would
-like to communicate to the grader such as extra functionalities you
-implemented or how you tried to fix your non-working code.
 
 Part 1:
-Everything works as expected !!
+Dynamic web-server. Handles HTTP/1.0 requests from clients one-by-one by establishing TCP connection between database and server.
 
 valgrind --leak-check=yes ./mdb-lookup-server 5354 ~j-hui/cs3157-pub/bin/mdb-cs3157
 ==2196750== Memcheck, a memory error detector
@@ -44,7 +34,7 @@ Connection terminated: 34.145.159.110
 ==2196750== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
 
 Part 2:
-Everything works as expected. The memory leaks are constant (or at least I
+Same as part 1, but uses forking to handle multiple requests at once. The memory leaks are constant (or at least I
 hope they are).
 
 valgrind --leak-check=yes ./http-server 4354 ~/html localhost 4356
